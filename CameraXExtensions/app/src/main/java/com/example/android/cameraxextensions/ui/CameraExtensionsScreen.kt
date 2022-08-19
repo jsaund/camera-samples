@@ -73,7 +73,7 @@ class CameraExtensionsScreen(private val root: View) {
             adapter = extensionsAdapter
             addItemDecoration(OffsetCenterItemDecoration())
             addOnScrollListener(object : RecyclerView.OnScrollListener() {
-                private var snapPosition = RecyclerView.NO_POSITION
+                private var snapPosition = 0
 
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                     if (newState == RecyclerView.SCROLL_STATE_IDLE) {

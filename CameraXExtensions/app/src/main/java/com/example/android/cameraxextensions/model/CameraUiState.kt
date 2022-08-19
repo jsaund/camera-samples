@@ -32,6 +32,7 @@ data class CameraUiState(
     val availableCameraLens: List<Int> = listOf(LENS_FACING_BACK),
     @LensFacing val cameraLens: Int = LENS_FACING_BACK,
     @ExtensionMode.Mode val extensionMode: Int = ExtensionMode.NONE,
+    val previewAttachDelegate: CameraPreviewAttachDelegate? = null
 )
 
 /**

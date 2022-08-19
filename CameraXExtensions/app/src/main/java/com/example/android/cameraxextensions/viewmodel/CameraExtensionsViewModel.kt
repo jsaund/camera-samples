@@ -23,11 +23,10 @@ import androidx.camera.core.CameraSelector.LensFacing
 import androidx.camera.extensions.ExtensionMode
 import androidx.camera.extensions.ExtensionsManager
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.example.android.cameraxextensions.app.CameraExtensionsApplication
+import com.example.android.cameraxextensions.model.CameraPreviewAttachDelegate
 import com.example.android.cameraxextensions.model.CameraState
 import com.example.android.cameraxextensions.model.CameraUiState
 import com.example.android.cameraxextensions.model.CaptureState
@@ -79,9 +78,6 @@ class CameraExtensionsViewModel(application: Application) : AndroidViewModel(app
         viewModelScope.launch {
             val currentCameraUiState = _cameraUiState.value
 
-            // get the camera selector for the select lens face
-            val cameraSelector = cameraLensToSelector(currentCameraUiState.cameraLens)
-
             // wait for the camera provider instance and extensions manager instance
             cameraProvider = ProcessCameraProvider.getInstance(getApplication()).await()
             extensionsManager =
@@ -95,6 +91,9 @@ class CameraExtensionsViewModel(application: Application) : AndroidViewModel(app
                     cameraProvider.hasCamera(cameraLensToSelector(lensFacing))
                 }
 
+            // get the camera selector for the select lens face
+            val cameraSelector = cameraLensToSelector(currentCameraUiState.cameraLens)
+
             // get the supported extensions for the selected camera lens by filtering the full list
             // of extensions and checking each one if it's available
             val availableExtensions = listOf(
@@ -107,53 +106,41 @@ class CameraExtensionsViewModel(application: Application) : AndroidViewModel(app
                 extensionsManager.isExtensionAvailable(cameraSelector, extensionMode)
             }
 
+            val currentExtensionMode =
+                if (availableExtensions.isEmpty()) ExtensionMode.NONE else currentCameraUiState.extensionMode
+
+            val currentCameraSelector = if (currentExtensionMode == ExtensionMode.NONE) {
+                cameraLensToSelector(currentCameraUiState.cameraLens)
+            } else {
+                extensionsManager.getExtensionEnabledCameraSelector(
+                    cameraLensToSelector(currentCameraUiState.cameraLens),
+                    currentExtensionMode
+                )
+            }
+
+            val useCaseGroup = UseCaseGroup.Builder()
+                .addUseCase(imageCapture)
+                .addUseCase(preview)
+                .build()
+
             // prepare the new camera UI state which is now in the READY state and contains the list
             // of available extensions, available lens faces.
             val newCameraUiState = currentCameraUiState.copy(
                 cameraState = CameraState.READY,
                 availableExtensions = listOf(ExtensionMode.NONE) + availableExtensions,
                 availableCameraLens = availableCameraLens,
-                extensionMode = if (availableExtensions.isEmpty()) ExtensionMode.NONE else currentCameraUiState.extensionMode,
+                extensionMode = currentExtensionMode,
+                previewAttachDelegate = CameraPreviewAttachDelegate(
+                    cameraProvider,
+                    useCaseGroup,
+                    currentCameraSelector
+                ) {
+                    viewModelScope.launch {
+                        _captureUiState.emit(CaptureState.CaptureReady)
+                    }
+                }
             )
             _cameraUiState.emit(newCameraUiState)
-        }
-    }
-
-    /**
-     * Starts the preview stream. The camera state should be in the READY or PREVIEW_STOPPED state
-     * when calling this operation.
-     * This process will bind the preview and image capture uses cases to the camera provider.
-     */
-    fun startPreview(
-        lifecycleOwner: LifecycleOwner,
-        previewView: PreviewView
-    ) {
-        val currentCameraUiState = _cameraUiState.value
-        val cameraSelector = if (currentCameraUiState.extensionMode == ExtensionMode.NONE) {
-            cameraLensToSelector(currentCameraUiState.cameraLens)
-        } else {
-            extensionsManager.getExtensionEnabledCameraSelector(
-                cameraLensToSelector(currentCameraUiState.cameraLens),
-                currentCameraUiState.extensionMode
-            )
-        }
-        val useCaseGroup = UseCaseGroup.Builder()
-            .setViewPort(previewView.viewPort!!)
-            .addUseCase(imageCapture)
-            .addUseCase(preview)
-            .build()
-        cameraProvider.unbindAll()
-        cameraProvider.bindToLifecycle(
-            lifecycleOwner,
-            cameraSelector,
-            useCaseGroup
-        )
-
-        preview.setSurfaceProvider(previewView.surfaceProvider)
-
-        viewModelScope.launch {
-            _cameraUiState.emit(_cameraUiState.value.copy(cameraState = CameraState.READY))
-            _captureUiState.emit(CaptureState.CaptureReady)
         }
     }
 
@@ -188,6 +175,7 @@ class CameraExtensionsViewModel(application: Application) : AndroidViewModel(app
                 _cameraUiState.emit(
                     newCameraUiState.copy(
                         cameraState = CameraState.NOT_READY,
+                        previewAttachDelegate = null
                     )
                 )
                 _captureUiState.emit(CaptureState.CaptureNotReady)
@@ -245,6 +233,7 @@ class CameraExtensionsViewModel(application: Application) : AndroidViewModel(app
                 _cameraUiState.value.copy(
                     cameraState = CameraState.NOT_READY,
                     extensionMode = extensionMode,
+                    previewAttachDelegate = null
                 )
             )
             _captureUiState.emit(CaptureState.CaptureNotReady)

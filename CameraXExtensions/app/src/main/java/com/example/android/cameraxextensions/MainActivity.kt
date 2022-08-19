@@ -39,6 +39,7 @@ import com.example.android.cameraxextensions.viewmodel.CameraExtensionsViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 /**
@@ -108,9 +109,13 @@ class MainActivity : AppCompatActivity() {
                     CameraUiAction.ClosePhotoPreviewClick -> {
                         cameraExtensionsScreen.hidePhoto()
                         cameraExtensionsScreen.showCameraControls()
-                        cameraExtensionsViewModel.startPreview(
-                            this@MainActivity as LifecycleOwner, cameraExtensionsScreen.previewView
-                        )
+                        cameraExtensionsViewModel.cameraUiState
+                            .firstOrNull()
+                            ?.previewAttachDelegate
+                            ?.startStreaming(
+                                this@MainActivity as LifecycleOwner,
+                                cameraExtensionsScreen.previewView
+                            ) ?: cameraExtensionsViewModel.initializeCamera()
                     }
                     CameraUiAction.RequestPermissionClick -> requestPermissionsLauncher.launch(
                         Manifest.permission.CAMERA
@@ -144,9 +149,13 @@ class MainActivity : AppCompatActivity() {
                     }
                     is CaptureState.CaptureFailed -> {
                         cameraExtensionsScreen.showCaptureError("Couldn't take photo")
-                        cameraExtensionsViewModel.startPreview(
-                            this@MainActivity as LifecycleOwner, cameraExtensionsScreen.previewView
-                        )
+                        cameraExtensionsViewModel.cameraUiState
+                            .firstOrNull()
+                            ?.previewAttachDelegate
+                            ?.startStreaming(
+                                this@MainActivity as LifecycleOwner,
+                                cameraExtensionsScreen.previewView
+                            ) ?: cameraExtensionsViewModel.initializeCamera()
                         cameraExtensionsScreen.enableCameraShutter(true)
                         cameraExtensionsScreen.enableSwitchLens(true)
                     }
@@ -187,7 +196,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         CameraState.READY -> {
                             cameraExtensionsScreen.previewView.doOnLaidOut {
-                                cameraExtensionsViewModel.startPreview(
+                                cameraUiState.previewAttachDelegate?.startStreaming(
                                     this@MainActivity as LifecycleOwner,
                                     cameraExtensionsScreen.previewView
                                 )
