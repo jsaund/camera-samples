@@ -18,6 +18,7 @@ package com.example.android.cameraxextensions.ui
 
 import android.util.Log
 import androidx.camera.core.MeteringPointFactory
+import androidx.camera.core.ViewPort
 import androidx.camera.view.CameraController
 import androidx.camera.view.PreviewView
 import androidx.camera.view.TransformExperimental
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.doOnAttach
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -116,7 +118,7 @@ class CameraPreviewState {
 
     suspend fun surfaceProvider() = previewViewDeferred.await().surfaceProvider
 
-    suspend fun viewPort() = previewViewDeferred.await().viewPort
+    suspend fun viewPort() = previewViewDeferred.await().viewPortOnAttach()
 
     suspend fun getController() = previewViewDeferred.await().controller
 
@@ -137,4 +139,12 @@ class CameraPreviewState {
     suspend fun getScaleType() = previewViewDeferred.await().scaleType
 
     suspend fun lifecycleOwner() = lifecycleOwnerDeferred.await()
+}
+
+suspend fun PreviewView.viewPortOnAttach(): ViewPort {
+    val viewPortDeferred = CompletableDeferred<ViewPort>()
+    doOnAttach {
+        viewPortDeferred.complete(viewPort!!)
+    }
+    return viewPortDeferred.await()
 }
