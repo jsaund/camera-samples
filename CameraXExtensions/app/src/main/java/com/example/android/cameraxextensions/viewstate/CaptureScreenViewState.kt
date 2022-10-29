@@ -21,7 +21,7 @@ package com.example.android.cameraxextensions.viewstate
  * and a post capture screen.
  */
 data class CaptureScreenViewState(
-    val cameraPreviewScreenViewState: CameraPreviewScreenViewState = CameraPreviewScreenViewState(),
+    val cameraPreviewScreenViewState: CameraPreviewScreenViewState = CameraPreviewScreenViewState(isVisible = false),
     val postCaptureScreenViewState: PostCaptureScreenViewState = PostCaptureScreenViewState.PostCaptureScreenHiddenViewState
 ) {
     fun updateCameraScreen(block: (cameraPreviewScreenViewState: CameraPreviewScreenViewState) -> CameraPreviewScreenViewState): CaptureScreenViewState =

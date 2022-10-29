@@ -23,10 +23,15 @@ import com.example.android.cameraxextensions.adapter.CameraExtensionItem
  * and the camera preview.
  */
 data class CameraPreviewScreenViewState(
+    val isVisible: Boolean = true,
     val shutterButtonViewState: ShutterButtonViewState = ShutterButtonViewState(),
     val switchLensButtonViewState: SwitchLensButtonViewState = SwitchLensButtonViewState(),
     val extensionsSelectorViewState: CameraExtensionSelectorViewState = CameraExtensionSelectorViewState()
 ) {
+    fun show(): CameraPreviewScreenViewState = copy(isVisible = true)
+
+    fun hide(): CameraPreviewScreenViewState = copy(isVisible = false)
+
     fun hideCameraControls(): CameraPreviewScreenViewState =
         copy(
             shutterButtonViewState = shutterButtonViewState.copy(isVisible = false),

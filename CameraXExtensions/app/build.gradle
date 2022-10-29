@@ -26,6 +26,14 @@ kapt {
 }
 
 android {
+    signingConfigs {
+        release {
+            storeFile file('/Users/jagsaund/cameraxextensions.jks')
+            storePassword 'androiddebug'
+            keyAlias 'CameraXExtensions'
+            keyPassword 'androiddebug'
+        }
+    }
     namespace 'com.example.android.cameraxextensions'
     compileSdk 33
 
@@ -37,6 +45,7 @@ android {
         versionName "1.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        signingConfig signingConfigs.debug
     }
 
     buildFeatures {
@@ -89,6 +98,10 @@ dependencies {
 
     // Image loading
     implementation "io.coil-kt:coil:2.1.0"
+    implementation("io.coil-kt:coil-compose:2.1.0")
+
+    // Snap to position for LazyColumn
+    implementation 'dev.chrisbanes.snapper:snapper:0.3.0'
 
     // Compose
     implementation 'androidx.compose.material:material:1.2.1'

@@ -22,12 +22,10 @@ import androidx.camera.core.CameraSelector.LensFacing
 import androidx.camera.extensions.ExtensionMode
 import androidx.camera.extensions.ExtensionsManager
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.compose.ui.layout.ScaleFactor
 import androidx.core.net.toUri
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.android.cameraxextensions.model.CameraPreviewReadyState
 import com.example.android.cameraxextensions.model.CameraState
 import com.example.android.cameraxextensions.model.CameraUiState
 import com.example.android.cameraxextensions.model.CaptureState
@@ -129,10 +127,7 @@ class CameraExtensionsViewModel(
      * when calling this operation.
      * This process will bind the preview and image capture uses cases to the camera provider.
      */
-    fun startPreview(
-        lifecycleOwner: LifecycleOwner,
-        previewView: PreviewView
-    ) {
+    fun startPreview(cameraPreviewReadyState: CameraPreviewReadyState) {
         val currentCameraUiState = _cameraUiState.value
         val cameraSelector = if (currentCameraUiState.extensionMode == ExtensionMode.NONE) {
             cameraLensToSelector(currentCameraUiState.cameraLens)
@@ -143,18 +138,17 @@ class CameraExtensionsViewModel(
             )
         }
         val useCaseGroup = UseCaseGroup.Builder()
-            .setViewPort(previewView.viewPort!!)
             .addUseCase(imageCapture)
             .addUseCase(preview)
             .build()
         cameraProvider.unbindAll()
         camera = cameraProvider.bindToLifecycle(
-            lifecycleOwner,
+            cameraPreviewReadyState.lifecycleOwner,
             cameraSelector,
             useCaseGroup
         )
 
-        preview.setSurfaceProvider(previewView.surfaceProvider)
+        preview.setSurfaceProvider(cameraPreviewReadyState.surfaceProvider)
 
         viewModelScope.launch {
             _cameraUiState.emit(_cameraUiState.value.copy(cameraState = CameraState.READY))
