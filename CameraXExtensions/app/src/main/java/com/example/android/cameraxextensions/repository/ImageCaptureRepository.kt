@@ -26,6 +26,7 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toFile
 import com.example.android.cameraxextensions.R
 import java.io.File
+import java.text.SimpleDateFormat
 import java.util.*
 
 /**
@@ -38,6 +39,8 @@ class ImageCaptureRepository internal constructor(private val rootDirectory: Fil
         const val TAG = "ImageCaptureRepository"
 
         private const val PHOTO_EXTENSION = ".jpg"
+        private const val FILENAME_PREFIX = "CAMERA_EXTENSIONS_"
+        private const val TIMESTAMP_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
 
         fun create(context: Context): ImageCaptureRepository {
             // Use external media if it is available and this app's file directory otherwise
@@ -71,6 +74,10 @@ class ImageCaptureRepository internal constructor(private val rootDirectory: Fil
 
     fun createImageOutputFile(): File = File(rootDirectory, generateFilename(PHOTO_EXTENSION))
 
-    private fun generateFilename(extension: String): String =
-        UUID.randomUUID().toString() + extension
+    private fun generateFilename(extension: String): String {
+        val timestamp = SimpleDateFormat(TIMESTAMP_FORMAT, Locale.US)
+            .format(System.currentTimeMillis())
+        // example: CAMERA_EXTENSIONS_2022-11-29-13-00-08-043.jpg"
+        return "$FILENAME_PREFIX$timestamp$extension"
+    }
 }
