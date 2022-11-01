@@ -62,7 +62,7 @@ fun CameraPreview(
     }
 
     AndroidView(
-        modifier = modifier
+        modifier = Modifier
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { offset ->
@@ -75,7 +75,8 @@ fun CameraPreview(
                     }
                 )
             }
-            .transformable(state = transformableState),
+            .transformable(state = transformableState)
+            .then(modifier),
         factory = { context ->
             PreviewView(context).apply {
                 keepScreenOn = true
@@ -143,7 +144,7 @@ class CameraPreviewState {
 
 suspend fun PreviewView.viewPortOnAttach(): ViewPort {
     val viewPortDeferred = CompletableDeferred<ViewPort>()
-    doOnAttach {
+    doOnLaidOut {
         viewPortDeferred.complete(viewPort!!)
     }
     return viewPortDeferred.await()
