@@ -22,6 +22,7 @@ import androidx.camera.core.ViewPort
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.LifecycleOwner
+import com.example.android.cameraxextensions.viewstate.CameraPermissionsViewState
 import com.example.android.cameraxextensions.viewstate.CaptureScreenViewState
 import com.example.android.cameraxextensions.viewstate.PostCaptureScreenViewState
 
@@ -30,6 +31,7 @@ fun CameraCaptureScreen(
     modifier: Modifier = Modifier,
     state: CaptureScreenViewState,
     cameraPreviewState: CameraPreviewState,
+    onRequestPermissionsClick: () -> Unit,
     onTap: (x: Float, y: Float, meteringPointFactory: MeteringPointFactory) -> Unit,
     onZoom: (Float) -> Unit,
     onShutterClick: () -> Unit,
@@ -37,13 +39,22 @@ fun CameraCaptureScreen(
     onClosePostCaptureClick: () -> Unit,
     onExtensionSelected: (Int) -> Unit
 ) {
-    if (state.cameraPreviewScreenViewState.isVisible) {
+    if (state.cameraPermissionsViewState is CameraPermissionsViewState.CameraPermissionsRequestViewState) {
+        CameraPermissionsScreen(
+            modifier = modifier,
+            shouldShowRationale = state.cameraPermissionsViewState.showRationale,
+            onRequestPermissionsClick = onRequestPermissionsClick
+        )
+    } else {
         CameraViewFinder(
             modifier = modifier,
+            isPreviewVisible = state.cameraPreviewScreenViewState.isVisible,
             isShutterButtonEnabled = state.cameraPreviewScreenViewState.shutterButtonViewState.isEnabled,
             isSwitchLensButtonEnabled = state.cameraPreviewScreenViewState.switchLensButtonViewState.isEnabled,
             isCameraControlsVisible = state.cameraPreviewScreenViewState.shutterButtonViewState.isVisible || state.cameraPreviewScreenViewState.switchLensButtonViewState.isVisible,
             isExtensionPickerVisible = state.cameraPreviewScreenViewState.extensionsSelectorViewState.isVisible,
+            isSnapshotVisible = state.cameraPreviewScreenViewState.isSnapshotVisible,
+            snapshot = state.cameraPreviewScreenViewState.snapshot,
             extensionPickerOptions = state.cameraPreviewScreenViewState.extensionsSelectorViewState.extensions,
             cameraPreviewState = cameraPreviewState,
             onTap = onTap,
@@ -52,14 +63,15 @@ fun CameraCaptureScreen(
             onSwitchLens = onSwitchLens,
             onExtensionSelected = onExtensionSelected
         )
-    }
 
-    if (state.postCaptureScreenViewState is PostCaptureScreenViewState.PostCaptureScreenVisibleViewState) {
-        CameraPostCaptureScreen(
-            modifier = modifier,
-            postCapturePhotoUri = state.postCaptureScreenViewState.uri,
-            onClosePostCaptureClick
-        )
+        if (state.postCaptureScreenViewState is PostCaptureScreenViewState.PostCaptureScreenVisibleViewState) {
+            CameraPostCaptureScreen(
+                modifier = modifier,
+                snapshot = state.cameraPreviewScreenViewState.snapshot,
+                postCapturePhotoUri = state.postCaptureScreenViewState.uri,
+                onClosePostCaptureClick
+            )
+        }
     }
 }
 

@@ -19,11 +19,14 @@ package com.example.android.cameraxextensions
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraProvider
 import androidx.camera.extensions.ExtensionMode
+import androidx.camera.extensions.ExtensionsManager
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Surface
 import androidx.compose.runtime.collectAsState
@@ -44,6 +47,7 @@ import com.example.android.cameraxextensions.ui.CameraCaptureScreen
 import com.example.android.cameraxextensions.ui.CameraPreviewState
 import com.example.android.cameraxextensions.viewmodel.CameraExtensionsViewModel
 import com.example.android.cameraxextensions.viewmodel.CameraExtensionsViewModelFactory
+import com.example.android.cameraxextensions.viewstate.CameraPermissionsViewState
 import com.example.android.cameraxextensions.viewstate.CaptureScreenViewState
 import com.example.android.cameraxextensions.viewstate.PostCaptureScreenViewState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,6 +92,18 @@ class MainActivity : ComponentActivity() {
 
         val cameraPreviewState = CameraPreviewState()
 
+        // initialize the permission state flow with the current camera permission status
+        permissionState = MutableStateFlow(getCurrentPermissionState())
+
+        val requestPermissionsLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+                if (isGranted) {
+                    lifecycleScope.launch { permissionState.emit(PermissionState.Granted) }
+                } else {
+                    lifecycleScope.launch { permissionState.emit(PermissionState.Denied(true)) }
+                }
+            }
+
         setContent {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -97,6 +113,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     state = captureScreenViewState.collectAsState().value,
                     cameraPreviewState = cameraPreviewState,
+                    onRequestPermissionsClick = {
+                        requestPermissionsLauncher.launch(Manifest.permission.CAMERA)
+                    },
                     onTap = { x, y, meteringPointFactory ->
                         cameraExtensionsViewModel.focus(meteringPointFactory.createPoint(x, y))
                     },
@@ -139,32 +158,12 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this, postCaptureBackPressedCallback)
 
-        // initialize the permission state flow with the current camera permission status
-        permissionState = MutableStateFlow(getCurrentPermissionState())
-
-        val requestPermissionsLauncher =
-            registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-                if (isGranted) {
-                    lifecycleScope.launch { permissionState.emit(PermissionState.Granted) }
-                } else {
-                    lifecycleScope.launch { permissionState.emit(PermissionState.Denied(true)) }
-                }
-            }
-
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 // check the current permission state every time upon the activity is resumed
                 permissionState.emit(getCurrentPermissionState())
             }
         }
-
-        // Consumes actions emitted by the UI and performs the appropriate operation associated with
-        // the view model or permission flow.
-        // Note that this flow is a shared flow and will not emit the last action unlike the state
-        // flows exposed by the view model for consuming UI state.
-//                    CameraUiAction.RequestPermissionClick -> {
-//                        requestPermissionsLauncher.launch(Manifest.permission.CAMERA)
-//                    }
 
         // Consume state emitted by the view model to render the Photo Capture state.
         // Upon collecting this state, the last emitted state will be immediately received.
@@ -193,10 +192,14 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     CaptureState.CaptureStarted -> {
+                        Log.d("CameraMainActivity", "Capture started")
+                        val snapshot = cameraPreviewState.bitmap()
+                        Log.d("CameraMainActivity", "Capture started: $snapshot")
                         captureScreenViewState.emit(
                             captureScreenViewState.value
                                 .updateCameraScreen {
-                                    it.enableCameraShutter(false)
+                                    it.showSnapshot(snapshot)
+                                        .enableCameraShutter(false)
                                         .enableSwitchLens(false)
                                 }
                         )
@@ -225,7 +228,9 @@ class MainActivity : ComponentActivity() {
                         captureScreenViewState.emit(
                             captureScreenViewState.value
                                 .updateCameraScreen {
-                                    it.show().showCameraControls()
+                                    it.show()
+                                        .hideSnapshot()
+                                        .showCameraControls()
                                         .enableCameraShutter(true)
                                         .enableSwitchLens(true)
                                 }
@@ -248,11 +253,15 @@ class MainActivity : ComponentActivity() {
                 .collectLatest { (permissionState, cameraUiState) ->
                     when (permissionState) {
                         PermissionState.Granted -> {
-//                            cameraExtensionsScreen.hidePermissionsRequest()
+                            captureScreenViewState.emit(
+                                captureScreenViewState.value.copy(cameraPermissionsViewState = CameraPermissionsViewState.CameraPermissionsGrantedViewState)
+                            )
                         }
                         is PermissionState.Denied -> {
                             if (cameraUiState.cameraState != CameraState.PREVIEW_STOPPED) {
-//                                cameraExtensionsScreen.showPermissionsRequest(permissionState.shouldShowRationale)
+                                captureScreenViewState.emit(
+                                    captureScreenViewState.value.copy(cameraPermissionsViewState = CameraPermissionsViewState.CameraPermissionsRequestViewState(showRationale = permissionState.shouldShowRationale))
+                                )
                                 return@collectLatest
                             }
                         }
@@ -278,7 +287,7 @@ class MainActivity : ComponentActivity() {
                                 captureScreenViewState.value
                                     .updateCameraScreen { s ->
                                         s.show()
-                                            .showCameraControls()
+                                            .hideSnapshot()
                                             .enableCameraShutter(true)
                                             .enableSwitchLens(true)
                                             .setAvailableExtensions(
@@ -290,13 +299,14 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                             )
+                                            .showCameraControls()
                                     }
                             )
                             cameraExtensionsViewModel.startPreview(
                                 CameraPreviewReadyState(
                                     lifecycleOwner = cameraPreviewState.lifecycleOwner(),
                                     viewPort = cameraPreviewState.viewPort(),
-                                    cameraPreviewState.surfaceProvider()
+                                    surfaceProvider = cameraPreviewState.surfaceProvider()
                                 )
                             )
                         }

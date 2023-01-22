@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
-package com.example.android.cameraxextensions.model
+package com.example.android.cameraxextensions.viewstate
 
-import androidx.camera.core.Preview.SurfaceProvider
-import androidx.camera.core.ViewPort
-import androidx.lifecycle.LifecycleOwner
+sealed interface CameraPermissionsViewState {
+    object CameraPermissionsGrantedViewState : CameraPermissionsViewState {
+        override fun requiresPermissions(): Boolean = false
+    }
 
-data class CameraPreviewReadyState(
-    val lifecycleOwner: LifecycleOwner,
-    val viewPort: ViewPort,
-    val surfaceProvider: SurfaceProvider
-)
+    data class CameraPermissionsRequestViewState(val showRationale: Boolean) :
+        CameraPermissionsViewState {
+        override fun requiresPermissions(): Boolean = true
+    }
+
+    fun requiresPermissions(): Boolean
+}

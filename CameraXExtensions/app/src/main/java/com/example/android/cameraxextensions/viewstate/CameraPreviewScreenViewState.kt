@@ -16,6 +16,7 @@
 
 package com.example.android.cameraxextensions.viewstate
 
+import android.graphics.Bitmap
 import com.example.android.cameraxextensions.adapter.CameraExtensionItem
 
 /**
@@ -24,6 +25,8 @@ import com.example.android.cameraxextensions.adapter.CameraExtensionItem
  */
 data class CameraPreviewScreenViewState(
     val isVisible: Boolean = true,
+    val isSnapshotVisible: Boolean = false,
+    val snapshot: Bitmap? = null,
     val shutterButtonViewState: ShutterButtonViewState = ShutterButtonViewState(),
     val switchLensButtonViewState: SwitchLensButtonViewState = SwitchLensButtonViewState(),
     val extensionsSelectorViewState: CameraExtensionSelectorViewState = CameraExtensionSelectorViewState()
@@ -31,6 +34,10 @@ data class CameraPreviewScreenViewState(
     fun show(): CameraPreviewScreenViewState = copy(isVisible = true)
 
     fun hide(): CameraPreviewScreenViewState = copy(isVisible = false)
+
+    fun showSnapshot(bitmap: Bitmap?) = copy(isSnapshotVisible = true, snapshot = bitmap)
+
+    fun hideSnapshot() = copy(isSnapshotVisible = false, snapshot = null)
 
     fun hideCameraControls(): CameraPreviewScreenViewState =
         copy(
@@ -43,7 +50,7 @@ data class CameraPreviewScreenViewState(
         copy(
             shutterButtonViewState = shutterButtonViewState.copy(isVisible = true),
             switchLensButtonViewState = switchLensButtonViewState.copy(isVisible = true),
-            extensionsSelectorViewState = extensionsSelectorViewState.copy(isVisible = true)
+            extensionsSelectorViewState = extensionsSelectorViewState.copy(isVisible = extensionsSelectorViewState.extensions.isNotEmpty())
         )
 
     fun enableCameraShutter(isEnabled: Boolean): CameraPreviewScreenViewState =

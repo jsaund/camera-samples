@@ -17,6 +17,7 @@
 package com.example.android.cameraxextensions.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.camera.core.*
 import androidx.camera.core.CameraSelector.LensFacing
 import androidx.camera.extensions.ExtensionMode
@@ -79,6 +80,7 @@ class CameraExtensionsViewModel(
      * CameraState.READY. Once the camera is ready the client can start the preview.
      */
     fun initializeCamera() {
+        Log.d("CameraExtensionsViewModel", "initializeCamera")
         viewModelScope.launch {
             val currentCameraUiState = _cameraUiState.value
 
@@ -90,6 +92,7 @@ class CameraExtensionsViewModel(
             extensionsManager =
                 ExtensionsManager.getInstanceAsync(application, cameraProvider).await()
 
+            Log.d("CameraExtensionsViewModel", "initializeCamera: [1]")
             val availableCameraLens =
                 listOf(
                     CameraSelector.LENS_FACING_BACK,
@@ -110,6 +113,8 @@ class CameraExtensionsViewModel(
                 extensionsManager.isExtensionAvailable(cameraSelector, extensionMode)
             }
 
+            Log.d("CameraExtensionsViewModel", "initializeCamera: [2]")
+
             // prepare the new camera UI state which is now in the READY state and contains the list
             // of available extensions, available lens faces.
             val newCameraUiState = currentCameraUiState.copy(
@@ -128,6 +133,7 @@ class CameraExtensionsViewModel(
      * This process will bind the preview and image capture uses cases to the camera provider.
      */
     fun startPreview(cameraPreviewReadyState: CameraPreviewReadyState) {
+        Log.d("CameraExtensionsViewModel", "startPreview")
         val currentCameraUiState = _cameraUiState.value
         val cameraSelector = if (currentCameraUiState.extensionMode == ExtensionMode.NONE) {
             cameraLensToSelector(currentCameraUiState.cameraLens)
@@ -138,6 +144,7 @@ class CameraExtensionsViewModel(
             )
         }
         val useCaseGroup = UseCaseGroup.Builder()
+            .setViewPort(cameraPreviewReadyState.viewPort)
             .addUseCase(imageCapture)
             .addUseCase(preview)
             .build()
@@ -160,6 +167,7 @@ class CameraExtensionsViewModel(
      * Stops the preview stream. This should be invoked when the captured image is displayed.
      */
     fun stopPreview() {
+        Log.d("CameraExtensionsViewModel", "stopPreview")
         preview.setSurfaceProvider(null)
         viewModelScope.launch {
             _cameraUiState.emit(_cameraUiState.value.copy(cameraState = CameraState.PREVIEW_STOPPED))
@@ -170,6 +178,7 @@ class CameraExtensionsViewModel(
      * Toggle the camera lens face. This has no effect if there is only one available camera lens.
      */
     fun switchCamera() {
+        Log.d("CameraExtensionsViewModel", "switchCamera")
         val currentCameraUiState = _cameraUiState.value
         if (currentCameraUiState.cameraState == CameraState.READY) {
             // To switch the camera lens, there has to be at least 2 camera lenses
@@ -216,10 +225,20 @@ class CameraExtensionsViewModel(
             ImageCapture.OutputFileOptions.Builder(photoFile)
                 .setMetadata(metadata)
                 .build()
+//
+//        imageCapture.takePicture(Dispatchers.Main.asExecutor(), object : ImageCapture.OnImageCapturedCallback() {
+//            override fun onError(exception: ImageCaptureException) {
+//                Log.d(TAG, "error capturing photo", exception)
+//            }
+//
+//            override fun onCaptureSuccess(image: ImageProxy) {
+//                show(image)
+//            }
+//        })
 
         imageCapture.takePicture(
             outputFileOptions,
-            Dispatchers.Default.asExecutor(),
+            Dispatchers.Main.asExecutor(),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     imageCaptureRepository.notifyImageCreated(

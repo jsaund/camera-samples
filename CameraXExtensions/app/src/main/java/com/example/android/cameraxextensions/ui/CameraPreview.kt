@@ -17,6 +17,9 @@
 package com.example.android.cameraxextensions.ui
 
 import android.util.Log
+import android.view.View
+import android.view.View.OnAttachStateChangeListener
+import android.view.ViewTreeObserver
 import androidx.camera.core.MeteringPointFactory
 import androidx.camera.core.ViewPort
 import androidx.camera.view.CameraController
@@ -27,12 +30,17 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.doOnAttach
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -46,18 +54,26 @@ fun CameraPreview(
     onTap: (x: Float, y: Float, meteringPointFactory: MeteringPointFactory) -> Unit,
     onZoom: (Float) -> Unit,
 ) {
+    Log.d(TAG, "start")
     val coroutineScope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     val transformableState = rememberTransformableState(onTransformation = { zoomChange, _, _ ->
         onZoom(zoomChange)
     })
 
-    state?.lifecycleOwnerDeferred?.complete(lifecycleOwner)
+    var previewView: PreviewView? by remember { mutableStateOf(null) }
 
     DisposableEffect(lifecycleOwner) {
         onDispose {
             Log.d(TAG, "onDispose")
             state?.clear()
+        }
+    }
+
+    LaunchedEffect(previewView) {
+        previewView?.let {
+            Log.d(TAG, "update [2]")
+            state?.viewPortDeferred?.complete(it.viewPort!!)
         }
     }
 
@@ -78,13 +94,27 @@ fun CameraPreview(
             .transformable(state = transformableState)
             .then(modifier),
         factory = { context ->
+            Log.d(TAG, "factory")
             PreviewView(context).apply {
                 keepScreenOn = true
                 scaleType = PreviewView.ScaleType.FILL_CENTER
+                viewTreeObserver.addOnGlobalLayoutListener(object :
+                    ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        Log.d(TAG, "on global layout")
+                        viewPort?.let {
+                            viewTreeObserver.removeOnGlobalLayoutListener(this)
+                            state?.viewPortDeferred?.complete(it)
+                        }
+                    }
+                })
             }
         },
         update = { view ->
+            Log.d(TAG, "update")
+            state?.lifecycleOwnerDeferred?.complete(lifecycleOwner)
             state?.previewViewDeferred?.complete(view)
+            previewView = view
         }
     )
 }
@@ -95,6 +125,7 @@ class CameraPreviewState {
     }
 
     internal var previewViewDeferred: CompletableDeferred<PreviewView> = CompletableDeferred()
+    internal var viewPortDeferred: CompletableDeferred<ViewPort> = CompletableDeferred()
     internal var lifecycleOwnerDeferred: CompletableDeferred<LifecycleOwner> = CompletableDeferred()
 
     init {
@@ -103,8 +134,10 @@ class CameraPreviewState {
 
     internal fun clear() {
         previewViewDeferred.cancel()
+        viewPortDeferred.cancel()
         lifecycleOwnerDeferred.cancel()
         previewViewDeferred = CompletableDeferred()
+        viewPortDeferred = CompletableDeferred()
         lifecycleOwnerDeferred = CompletableDeferred()
     }
 
@@ -119,7 +152,7 @@ class CameraPreviewState {
 
     suspend fun surfaceProvider() = previewViewDeferred.await().surfaceProvider
 
-    suspend fun viewPort() = previewViewDeferred.await().viewPortOnAttach()
+    suspend fun viewPort() = viewPortDeferred.await()
 
     suspend fun getController() = previewViewDeferred.await().controller
 
@@ -140,12 +173,4 @@ class CameraPreviewState {
     suspend fun getScaleType() = previewViewDeferred.await().scaleType
 
     suspend fun lifecycleOwner() = lifecycleOwnerDeferred.await()
-}
-
-suspend fun PreviewView.viewPortOnAttach(): ViewPort {
-    val viewPortDeferred = CompletableDeferred<ViewPort>()
-    doOnLaidOut {
-        viewPortDeferred.complete(viewPort!!)
-    }
-    return viewPortDeferred.await()
 }

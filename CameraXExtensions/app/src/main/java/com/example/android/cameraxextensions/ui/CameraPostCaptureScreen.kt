@@ -16,6 +16,8 @@
 
 package com.example.android.cameraxextensions.ui
 
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -42,6 +44,7 @@ import com.example.android.cameraxextensions.R
 @Composable
 fun CameraPostCaptureScreen(
     modifier: Modifier = Modifier,
+    snapshot: Bitmap? = null,
     postCapturePhotoUri: Uri = Uri.EMPTY,
     onCloseClick: () -> Unit = {}
 ) {
@@ -51,7 +54,8 @@ fun CameraPostCaptureScreen(
             painter = rememberAsyncImagePainter(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(postCapturePhotoUri)
-                    .crossfade(true)
+                    .crossfade(200)
+                    .placeholder(BitmapDrawable(LocalContext.current.resources, snapshot))
                     .build()
             ),
             contentDescription = "Photo capture preview"

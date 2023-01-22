@@ -16,7 +16,9 @@
 
 package com.example.android.cameraxextensions.ui
 
+import android.graphics.Bitmap
 import android.os.SystemClock
+import android.util.Log
 import androidx.camera.core.MeteringPointFactory
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -57,10 +59,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.dynamicanimation.animation.SpringForce
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.android.cameraxextensions.R
 import com.example.android.cameraxextensions.adapter.CameraExtensionItem
 import kotlinx.coroutines.delay
@@ -72,10 +77,13 @@ data class TapToFocusPoint(val x: Float = 0f, val y: Float = 0f)
 @Composable
 fun CameraViewFinder(
     modifier: Modifier = Modifier,
+    isPreviewVisible: Boolean,
     isShutterButtonEnabled: Boolean,
     isSwitchLensButtonEnabled: Boolean,
     isCameraControlsVisible: Boolean,
     isExtensionPickerVisible: Boolean,
+    isSnapshotVisible: Boolean,
+    snapshot: Bitmap?,
     extensionPickerOptions: List<CameraExtensionItem>,
     cameraPreviewState: CameraPreviewState,
     onTap: (x: Float, y: Float, meteringPointFactory: MeteringPointFactory) -> Unit,
@@ -90,27 +98,42 @@ fun CameraViewFinder(
     var focusPointId: Long by remember { mutableStateOf(0L) }
 
     Box(modifier) {
-        CameraPreview(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { (x, y) ->
-                            coroutineScope.launch {
-                                focusPoint = TapToFocusPoint(x, y)
-                                focusPointId = SystemClock.elapsedRealtimeNanos()
-                                onTap(x, y, cameraPreviewState.meteringPointFactory())
+        if (isPreviewVisible) {
+            CameraPreview(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { (x, y) ->
+                                coroutineScope.launch {
+                                    focusPoint = TapToFocusPoint(x, y)
+                                    focusPointId = SystemClock.elapsedRealtimeNanos()
+                                    onTap(x, y, cameraPreviewState.meteringPointFactory())
+                                }
+                            },
+                            onDoubleTap = {
+                                onSwitchLens()
                             }
-                        },
-                        onDoubleTap = {
-                            onSwitchLens()
-                        }
-                    )
-                },
-            cameraPreviewState,
-            onTap = { _, _, _ -> },
-            onZoom
-        )
+                        )
+                    },
+                cameraPreviewState,
+                onTap = { _, _, _ -> },
+                onZoom
+            )
+        }
+
+        if (isSnapshotVisible && snapshot != null) {
+            Log.d("CameraViewFinder", "show snapshot")
+            Image(
+                modifier = Modifier.fillMaxSize(),
+                painter = rememberAsyncImagePainter(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(snapshot)
+                        .build()
+                ),
+                contentDescription = "Capture snapshot"
+            )
+        }
 
         if (isCameraControlsVisible) {
             Column(
@@ -120,13 +143,15 @@ fun CameraViewFinder(
                 if (isExtensionPickerVisible) {
                     val options = remember { extensionPickerOptions.map { it.name } }
 
-                    HorizontalPicker(
-                        options = options,
-                        onItemSelected = { _, itemIndex ->
-                            onExtensionSelected(extensionPickerOptions[itemIndex].extensionMode)
-                        })
+                    if (options.isNotEmpty()) {
+                        HorizontalPicker(
+                            options = options,
+                            onItemSelected = { _, itemIndex ->
+                                onExtensionSelected(extensionPickerOptions[itemIndex].extensionMode)
+                            })
 
-                    Spacer(modifier = Modifier.size(width = 1.dp, height = 16.dp))
+                        Spacer(modifier = Modifier.size(width = 1.dp, height = 16.dp))
+                    }
                 }
 
                 Row(
@@ -256,9 +281,12 @@ private fun ShutterButton(
                 .padding(9.dp)
                 .pointerInput(Unit) {
                     detectTapGestures(onPress = {
+                        Log.d("CameraViewFinder", "onPress")
                         isPressed = true
                         if (tryAwaitRelease()) {
+                            Log.d("CameraViewFinder", "onClick start")
                             onClick()
+                            Log.d("CameraViewFinder", "onClick end")
                         }
                         isPressed = false
                     })
